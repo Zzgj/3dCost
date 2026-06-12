@@ -24,14 +24,32 @@ def _serialize(db: Session, obj) -> dict:
     return data
 
 
+def _serialize_safe(db: Session, obj) -> dict:
+    """列表用：单件成本装配失败（如机器缺失）时降级，cost 置空并附 warning，
+    不让整页列表请求失败。"""
+    data = PrintItemOut.model_validate(obj).model_dump(mode="json")
+    try:
+        cost = cost_assembler.assemble_print_item_cost(db, obj)
+        data["cost"] = {k: str(v) for k, v in cost.items()}
+    except APIError as exc:
+        data["cost"] = None
+        data["cost_error"] = exc.code
+    return data
+
+
 @router.post("")
 def create_print_item(payload: PrintItemCreate, db: Session = Depends(get_db)):
     fields = payload.model_dump(exclude={"filaments"})
     filaments = [f.model_dump() for f in payload.filaments]
     obj = print_item_repo.create(db, filaments=filaments, **fields)
+    # 先装配成本（校验机器存在），失败则回滚，避免落库脏数据
+    try:
+        data = _serialize(db, obj)
+    except APIError:
+        db.rollback()
+        raise
     db.commit()
-    obj = print_item_repo.get(db, obj.id)
-    return ok(_serialize(db, obj))
+    return ok(data)
 
 
 @router.get("")
@@ -41,7 +59,7 @@ def list_print_items(
     db: Session = Depends(get_db),
 ):
     rows, total = print_item_repo.list_active(db, page, page_size)
-    data = [_serialize(db, r) for r in rows]
+    data = [_serialize_safe(db, r) for r in rows]
     return ok_list(data, page, page_size, total)
 
 
@@ -57,9 +75,14 @@ def update_print_item(print_item_id: int, payload: PrintItemUpdate, db: Session 
     fields = payload.model_dump(exclude_unset=True)
     filaments = fields.pop("filaments", None)
     print_item_repo.update(db, obj, filaments=filaments, **fields)
+    # 先装配成本（校验机器存在），失败则回滚，避免提交无效引用
+    try:
+        data = _serialize(db, obj)
+    except APIError:
+        db.rollback()
+        raise
     db.commit()
-    obj = print_item_repo.get(db, print_item_id)
-    return ok(_serialize(db, obj))
+    return ok(data)
 
 
 @router.delete("/{print_item_id}")

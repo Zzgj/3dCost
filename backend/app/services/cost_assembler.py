@@ -9,11 +9,11 @@ from app.services import costing
 
 
 def assemble_print_item_cost(db: Session, print_item: PrintItem) -> dict[str, Decimal]:
-    """从 DB 装配打印件成本所需数据并计算成本。缺机器时抛 COST_SOURCE_MISSING。"""
+    """从 DB 装配打印件成本所需数据并计算成本。缺机器或机器已停用时抛 COST_SOURCE_MISSING。"""
     machine = db.get(Machine, print_item.machine_id)
-    if machine is None:
+    if machine is None or not machine.is_active:
         raise APIError(
-            "COST_SOURCE_MISSING", "打印件关联的机器不存在", status_code=400,
+            "COST_SOURCE_MISSING", "打印件关联的机器不存在或已停用", status_code=400,
             details={"machine_id": print_item.machine_id},
         )
 
@@ -23,7 +23,7 @@ def assemble_print_item_cost(db: Session, print_item: PrintItem) -> dict[str, De
         price = material.avg_price_per_g if material else Decimal("0")
         filament_rows.append((f.grams, price))
 
-    setting = settings_repo.get_or_create(db)
+    setting = settings_repo.get_or_default(db)
     return costing.calc_print_item_cost(
         filaments=filament_rows,
         print_hours=print_item.print_hours,
