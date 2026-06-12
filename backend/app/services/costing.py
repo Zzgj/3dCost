@@ -19,6 +19,8 @@ def calc_print_item_cost(
 
     filaments: [(grams, price_per_g), ...]
     返回 {material_cost, machine_cost, total}，各项四舍五入到 2 位。
+
+    前置条件：machine_life_hours 必须 > 0（由调用方/schema 保证，machine 创建时已用 gt=0 校验），否则机时折旧计算会触发除零。
     """
     material_cost = sum(
         (grams * price_per_g for grams, price_per_g in filaments), Decimal("0")

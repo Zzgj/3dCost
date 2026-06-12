@@ -99,3 +99,46 @@ def test_product_cost_zero_scrap():
     assert result["scrap_cost"] == Decimal("0.00")
     assert result["total_cost"] == Decimal("100.00")
     assert result["customer_price"] == Decimal("150.00")
+
+
+def test_print_item_empty_filaments():
+    """空 filaments：耗材成本为0，机时成本仍 > 0"""
+    result = calc_print_item_cost(
+        filaments=[],
+        print_hours=Decimal("1"),
+        machine_price=Decimal("7999"),
+        machine_life_hours=10000,
+        machine_power_w=350,
+        electricity_price=Decimal("0.65"),
+    )
+    assert result["material_cost"] == Decimal("0.00")
+    assert result["machine_cost"] > 0
+
+
+def test_product_cost_empty_bom():
+    """空 BOM：所有分项及汇总均为0"""
+    result = calc_product_cost(
+        bom_items=[],
+        markup_rate=Decimal("1.6"),
+        labor_rate=Decimal("30"),
+        scrap_rate=Decimal("0.05"),
+    )
+    assert result["printitems_cost"] == Decimal("0.00")
+    assert result["parts_cost"] == Decimal("0.00")
+    assert result["postprocess_cost"] == Decimal("0.00")
+    assert result["subproduct_cost"] == Decimal("0.00")
+    assert result["subtotal"] == Decimal("0.00")
+    assert result["scrap_cost"] == Decimal("0.00")
+    assert result["total_cost"] == Decimal("0.00")
+    assert result["customer_price"] == Decimal("0.00")
+
+
+def test_product_cost_zero_qty():
+    """零数量：part qty=0，parts_cost 为0"""
+    result = calc_product_cost(
+        bom_items=[{"kind": "part", "unit_price": Decimal("100"), "qty": Decimal("0")}],
+        markup_rate=Decimal("1.6"),
+        labor_rate=Decimal("30"),
+        scrap_rate=Decimal("0.05"),
+    )
+    assert result["parts_cost"] == Decimal("0.00")
