@@ -65,15 +65,18 @@ def calc_product_cost(
     subtotal = printitems_cost + parts_cost + postprocess_cost + subproduct_cost
     scrap_cost = subtotal * scrap_rate
     total_cost = subtotal + scrap_cost
-    customer_price = total_cost * markup_rate
+    r_subtotal = _r(subtotal)
+    r_scrap = _r(scrap_cost)
+    r_total = _r(total_cost)
+    customer_price = r_total * markup_rate
 
     return {
         "printitems_cost": _r(printitems_cost),
         "parts_cost": _r(parts_cost),
         "postprocess_cost": _r(postprocess_cost),
         "subproduct_cost": _r(subproduct_cost),
-        "subtotal": _r(subtotal),
-        "scrap_cost": _r(scrap_cost),
-        "total_cost": _r(total_cost),
+        "subtotal": r_subtotal,
+        "scrap_cost": r_scrap,
+        "total_cost": r_total,
         "customer_price": _r(customer_price),
     }

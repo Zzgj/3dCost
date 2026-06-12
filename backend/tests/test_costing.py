@@ -45,3 +45,57 @@ def test_print_item_zero_hours():
     assert result["material_cost"] == Decimal("10.00")
     assert result["machine_cost"] == Decimal("0.00")
     assert result["total"] == Decimal("10.00")
+
+
+def test_product_cost_flat():
+    """扁平BOM：打印件18.03 + 零件17.33 + 后处理0.8h*30=24 → subtotal=59.36; scrap5%=2.97; total=62.33; price*1.6=99.73"""
+    result = calc_product_cost(
+        bom_items=[
+            {"kind": "printitem", "unit_price": Decimal("18.03"), "qty": Decimal("1")},
+            {"kind": "part", "unit_price": Decimal("17.33"), "qty": Decimal("1")},
+            {"kind": "postprocess", "hours": Decimal("0.8")},
+        ],
+        markup_rate=Decimal("1.6"),
+        labor_rate=Decimal("30"),
+        scrap_rate=Decimal("0.05"),
+    )
+    assert result["printitems_cost"] == Decimal("18.03")
+    assert result["parts_cost"] == Decimal("17.33")
+    assert result["postprocess_cost"] == Decimal("24.00")
+    assert result["subproduct_cost"] == Decimal("0.00")
+    assert result["subtotal"] == Decimal("59.36")
+    assert result["scrap_cost"] == Decimal("2.97")
+    assert result["total_cost"] == Decimal("62.33")
+    assert result["customer_price"] == Decimal("99.73")
+
+
+def test_product_cost_with_subproduct():
+    """含子产品：子total=50，2个→100；加零件10→subtotal110；scrap5%=5.5→total=115.5；*2=231"""
+    result = calc_product_cost(
+        bom_items=[
+            {"kind": "subproduct", "unit_price": Decimal("50"), "qty": Decimal("2")},
+            {"kind": "part", "unit_price": Decimal("10"), "qty": Decimal("1")},
+        ],
+        markup_rate=Decimal("2"),
+        labor_rate=Decimal("30"),
+        scrap_rate=Decimal("0.05"),
+    )
+    assert result["subproduct_cost"] == Decimal("100.00")
+    assert result["parts_cost"] == Decimal("10.00")
+    assert result["subtotal"] == Decimal("110.00")
+    assert result["scrap_cost"] == Decimal("5.50")
+    assert result["total_cost"] == Decimal("115.50")
+    assert result["customer_price"] == Decimal("231.00")
+
+
+def test_product_cost_zero_scrap():
+    """废品率为0时无损耗"""
+    result = calc_product_cost(
+        bom_items=[{"kind": "part", "unit_price": Decimal("100"), "qty": Decimal("1")}],
+        markup_rate=Decimal("1.5"),
+        labor_rate=Decimal("30"),
+        scrap_rate=Decimal("0"),
+    )
+    assert result["scrap_cost"] == Decimal("0.00")
+    assert result["total_cost"] == Decimal("100.00")
+    assert result["customer_price"] == Decimal("150.00")
