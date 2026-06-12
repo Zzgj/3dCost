@@ -235,3 +235,68 @@ class PrintItemOut(ORMModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+# ---------- Product / BOM ----------
+class BOMItemIn(BaseModel):
+    kind: str = Field(pattern="^(printitem|part|postprocess|subproduct)$")
+    ref_id: int | None = None
+    qty: Decimal | None = Field(default=None, gt=0)
+    hours: Decimal | None = Field(default=None, ge=0)
+
+
+class ProductCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    note: str | None = Field(default=None, max_length=500)
+    mode: str = Field(default="estimate", pattern="^(estimate|actual)$")
+    markup_rate: Decimal = Field(default=Decimal("1.6"), gt=0)
+    bom_items: list[BOMItemIn] = Field(default_factory=list)
+
+
+class ProductUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    note: str | None = Field(default=None, max_length=500)
+    mode: str | None = Field(default=None, pattern="^(estimate|actual)$")
+    markup_rate: Decimal | None = Field(default=None, gt=0)
+    bom_items: list[BOMItemIn] | None = None
+
+
+class BOMItemOut(ORMModel):
+    id: int
+    kind: str
+    ref_id: int | None
+    ref_name: str | None = None
+    qty: Decimal | None
+    hours: Decimal | None
+    unit_price: Decimal
+    subtotal: Decimal
+
+
+class CostDetail(BaseModel):
+    printitems_cost: Decimal
+    parts_cost: Decimal
+    postprocess_cost: Decimal
+    subproduct_cost: Decimal
+    subtotal: Decimal
+    scrap_cost: Decimal
+    total_cost: Decimal
+    customer_price: Decimal
+
+
+class ProductOut(ORMModel):
+    id: int
+    name: str
+    note: str | None
+    mode: str
+    status: str
+    markup_rate: Decimal
+    total_cost: Decimal
+    customer_price: Decimal
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProductDetailOut(ProductOut):
+    bom_items: list[BOMItemOut]
+    cost_detail: CostDetail
