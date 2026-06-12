@@ -88,3 +88,99 @@ def record_part_purchase(
         "updated_avg_price": part.avg_unit_price,
         "total_stock": part.stock_qty,
     }
+
+
+# ---------- 产品库存扣减 ----------
+from app.models import PrintItem, Product  # noqa: E402
+
+
+class InsufficientStockError(Exception):
+    """库存不足，无法扣减。"""
+
+    def __init__(self, message: str, details: dict):
+        self.details = details
+        super().__init__(message)
+
+
+def _material_demand(db: Session, product: Product) -> dict[int, Decimal]:
+    """汇总产品 BOM 中所有打印件 filaments 的耗材需求（material_id → 总克数）。"""
+    demand: dict[int, Decimal] = {}
+    for it in product.bom_items:
+        if it.kind != "printitem" or it.ref_id is None:
+            continue
+        qty = it.qty or Decimal("1")
+        pi = db.get(PrintItem, it.ref_id)
+        if pi is None:
+            continue
+        for f in pi.filaments:
+            demand[f.material_id] = demand.get(f.material_id, Decimal("0")) + f.grams * qty
+    return demand
+
+
+def _part_demand(product: Product) -> dict[int, Decimal]:
+    """汇总产品 BOM 中零件需求（part_id → 总数量）。"""
+    demand: dict[int, Decimal] = {}
+    for it in product.bom_items:
+        if it.kind != "part" or it.ref_id is None:
+            continue
+        demand[it.ref_id] = demand.get(it.ref_id, Decimal("0")) + (it.qty or Decimal("1"))
+    return demand
+
+
+def consume_stock_for_product(db: Session, product: Product) -> dict:
+    """单事务内按 BOM 扣减耗材与零件。先全量校验，任一不足抛 InsufficientStockError 不做扣减。
+
+    调用方负责 commit/rollback。返回 {"consumed": {...}, "warnings": [...]}。
+    """
+    mat_demand = _material_demand(db, product)
+    part_demand = _part_demand(product)
+
+    # 1. 全量校验
+    materials: dict[int, Material] = {}
+    for mid, need in mat_demand.items():
+        m = db.get(Material, mid)
+        if m is None or m.stock_g < need:
+            raise InsufficientStockError(
+                "耗材库存不足",
+                {
+                    "material_id": mid,
+                    "required_g": str(need),
+                    "stock_g": str(m.stock_g if m else 0),
+                },
+            )
+        materials[mid] = m
+    parts: dict[int, Part] = {}
+    for pid, need in part_demand.items():
+        p = db.get(Part, pid)
+        if p is None or p.stock_qty < need:
+            raise InsufficientStockError(
+                "零件库存不足",
+                {
+                    "part_id": pid,
+                    "required_qty": str(need),
+                    "stock_qty": str(p.stock_qty if p else 0),
+                },
+            )
+        parts[pid] = p
+
+    # 2. 校验通过，统一扣减
+    consumed: dict[str, list] = {"materials": [], "parts": []}
+    warnings: list[str] = []
+    for mid, need in mat_demand.items():
+        m = materials[mid]
+        m.stock_g -= need
+        consumed["materials"].append(
+            {"name": m.name, "deducted_g": str(need), "remaining_g": str(m.stock_g)}
+        )
+        if m.stock_g < m.low_stock_g:
+            warnings.append(f"{m.name} 低于库存阈值")
+    for pid, need in part_demand.items():
+        p = parts[pid]
+        p.stock_qty -= need
+        consumed["parts"].append(
+            {"name": p.name, "deducted_qty": str(need), "remaining_qty": str(p.stock_qty)}
+        )
+        if p.stock_qty < p.low_stock_qty:
+            warnings.append(f"{p.name} 低于库存阈值")
+    db.flush()
+    return {"consumed": consumed, "warnings": warnings}
