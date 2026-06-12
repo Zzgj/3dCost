@@ -184,3 +184,55 @@ class PurchaseResult(BaseModel):
     purchase: PurchaseOut
     updated_avg_price: Decimal
     total_stock: Decimal
+
+
+# ---------- PrintItem ----------
+class PrintFilamentIn(BaseModel):
+    material_id: int
+    grams: Decimal = Field(gt=0)
+
+
+class PrintFilamentOut(ORMModel):
+    material_id: int
+    grams: Decimal
+
+
+class CostOut(BaseModel):
+    material_cost: Decimal
+    machine_cost: Decimal
+    total: Decimal
+
+
+class PrintItemCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    machine_id: int
+    print_hours: Decimal = Field(ge=0)
+    plates: int = Field(default=1, ge=1)
+    nozzle: str = "0.4mm"
+    source_url: str | None = Field(default=None, max_length=500)
+    filaments: list[PrintFilamentIn] = []
+
+
+class PrintItemUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    machine_id: int | None = None
+    print_hours: Decimal | None = Field(default=None, ge=0)
+    plates: int | None = Field(default=None, ge=1)
+    nozzle: str | None = None
+    source_url: str | None = Field(default=None, max_length=500)
+    filaments: list[PrintFilamentIn] | None = None
+    is_active: bool | None = None
+
+
+class PrintItemOut(ORMModel):
+    id: int
+    name: str
+    machine_id: int
+    print_hours: Decimal
+    plates: int
+    nozzle: str
+    source_url: str | None
+    filaments: list[PrintFilamentOut]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
