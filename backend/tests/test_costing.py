@@ -48,7 +48,7 @@ def test_print_item_zero_hours():
 
 
 def test_product_cost_flat():
-    """扁平BOM：打印件18.03 + 零件17.33 + 后处理0.8h*30=24 → subtotal=59.36; scrap5%=2.97; total=62.33; price*1.6=99.73"""
+    """扁平BOM：打印件18.03 + 零件17.33 + 后处理0.8h*30=24 → subtotal=59.36; scrap5%=2.968; total=62.328(展示62.33); price=未舍入total*1.6=99.7248→99.72"""
     result = calc_product_cost(
         bom_items=[
             {"kind": "printitem", "unit_price": Decimal("18.03"), "qty": Decimal("1")},
@@ -66,7 +66,7 @@ def test_product_cost_flat():
     assert result["subtotal"] == Decimal("59.36")
     assert result["scrap_cost"] == Decimal("2.97")
     assert result["total_cost"] == Decimal("62.33")
-    assert result["customer_price"] == Decimal("99.73")
+    assert result["customer_price"] == Decimal("99.72")
 
 
 def test_product_cost_with_subproduct():

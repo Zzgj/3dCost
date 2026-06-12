@@ -68,7 +68,7 @@ def calc_product_cost(
     r_subtotal = _r(subtotal)
     r_scrap = _r(scrap_cost)
     r_total = _r(total_cost)
-    customer_price = r_total * markup_rate
+    customer_price = total_cost * markup_rate
 
     return {
         "printitems_cost": _r(printitems_cost),
