@@ -221,7 +221,6 @@ class PrintItemUpdate(BaseModel):
     nozzle: str | None = None
     source_url: str | None = Field(default=None, max_length=500)
     filaments: list[PrintFilamentIn] | None = None
-    is_active: bool | None = None
 
 
 class PrintItemOut(ORMModel):
