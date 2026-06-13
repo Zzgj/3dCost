@@ -83,3 +83,20 @@ def test_consume_insufficient_part_rolls_back(db_session):
         consume_stock_for_product(db, prod)
     # 耗材未被扣减
     assert m.stock_g == Decimal("1000.000")
+
+
+def test_consume_includes_subproduct_demands(db_session):
+    db = db_session
+    m, part, child = _seed(db)
+    parent = Product(name="母件")
+    db.add(parent)
+    db.flush()
+    db.add(BOMItem(product_id=parent.id, kind="subproduct", ref_id=child.id, qty=Decimal("1")))
+    db.flush()
+
+    result = consume_stock_for_product(db, parent)
+
+    assert m.stock_g == Decimal("800.000")
+    assert part.stock_qty == Decimal("4.000")
+    assert result["consumed"]["materials"][0]["deducted_g"] == "200.000"
+    assert result["consumed"]["parts"][0]["deducted_qty"] == "1.000"

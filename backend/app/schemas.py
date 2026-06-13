@@ -300,3 +300,66 @@ class ProductOut(ORMModel):
 class ProductDetailOut(ProductOut):
     bom_items: list[BOMItemOut]
     cost_detail: CostDetail
+
+
+# ---------- Quote / Stats / Backup ----------
+class QuoteCreate(BaseModel):
+    product_id: int
+    mode: str | None = Field(default=None, pattern="^(estimate|actual)$")
+
+
+class QuoteOut(ORMModel):
+    id: int
+    product_id: int
+    mode: str
+    internal_cost: Decimal
+    customer_price: Decimal
+    created_at: datetime
+
+
+class QuoteDetailOut(QuoteOut):
+    snapshot: dict
+
+
+class LowStockMaterialOut(BaseModel):
+    id: int
+    name: str
+    stock_g: Decimal
+    low_stock_g: Decimal
+    avg_price_per_g: Decimal
+
+
+class LowStockPartOut(BaseModel):
+    id: int
+    name: str
+    stock_qty: Decimal
+    low_stock_qty: Decimal
+    avg_unit_price: Decimal
+    use_unit: str
+
+
+class LowStockOut(BaseModel):
+    materials: list[LowStockMaterialOut]
+    parts: list[LowStockPartOut]
+
+
+class MonthlyStatsOut(BaseModel):
+    year: int
+    month: int
+    products_count: int
+    completed_count: int
+    total_cost: Decimal
+    customer_price: Decimal
+    estimated_profit: Decimal
+
+
+class MaterialUsageOut(BaseModel):
+    material_id: int
+    material_name: str
+    grams: Decimal
+
+
+class BackupOut(BaseModel):
+    filename: str
+    size_bytes: int
+    created_at: datetime

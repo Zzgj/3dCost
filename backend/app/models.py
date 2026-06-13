@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -150,3 +150,14 @@ class BOMItem(Base):
     subtotal: Mapped[Decimal] = mapped_column(AMOUNT, default=Decimal("0"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     product: Mapped["Product"] = relationship(back_populates="bom_items")
+
+
+class Quote(Base):
+    __tablename__ = "quotes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    mode: Mapped[str] = mapped_column(String(20), default="estimate")
+    internal_cost: Mapped[Decimal] = mapped_column(AMOUNT, default=Decimal("0"))
+    customer_price: Mapped[Decimal] = mapped_column(AMOUNT, default=Decimal("0"))
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

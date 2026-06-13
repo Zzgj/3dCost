@@ -6,6 +6,11 @@ const router = createRouter({
     { path: '/', redirect: '/inventory' },
     { path: '/inventory', component: () => import('@/views/Inventory.vue') },
     { path: '/purchases', component: () => import('@/views/Purchases.vue') },
+    { path: '/print-items', component: () => import('@/views/PrintItems.vue') },
+    { path: '/products', component: () => import('@/views/Products.vue') },
+    { path: '/quotes', component: () => import('@/views/Quotes.vue') },
+    { path: '/dashboard', component: () => import('@/views/Dashboard.vue') },
+    { path: '/backups', component: () => import('@/views/Backups.vue') },
     { path: '/settings', component: () => import('@/views/Settings.vue') },
   ],
 })

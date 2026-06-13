@@ -102,28 +102,57 @@ class InsufficientStockError(Exception):
         super().__init__(message)
 
 
-def _material_demand(db: Session, product: Product) -> dict[int, Decimal]:
-    """汇总产品 BOM 中所有打印件 filaments 的耗材需求（material_id → 总克数）。"""
+def _material_demand(
+    db: Session,
+    product: Product,
+    multiplier: Decimal = Decimal("1"),
+    seen: set[int] | None = None,
+) -> dict[int, Decimal]:
+    """汇总产品 BOM 树中所有打印件 filaments 的耗材需求（material_id → 总克数）。"""
+    seen = seen or set()
+    if product.id in seen:
+        return {}
+    seen.add(product.id)
     demand: dict[int, Decimal] = {}
     for it in product.bom_items:
-        if it.kind != "printitem" or it.ref_id is None:
-            continue
-        qty = it.qty or Decimal("1")
-        pi = db.get(PrintItem, it.ref_id)
-        if pi is None:
-            continue
-        for f in pi.filaments:
-            demand[f.material_id] = demand.get(f.material_id, Decimal("0")) + f.grams * qty
+        qty = (it.qty or Decimal("1")) * multiplier
+        if it.kind == "printitem" and it.ref_id is not None:
+            pi = db.get(PrintItem, it.ref_id)
+            if pi is None:
+                continue
+            for f in pi.filaments:
+                demand[f.material_id] = demand.get(f.material_id, Decimal("0")) + f.grams * qty
+        elif it.kind == "subproduct" and it.ref_id is not None:
+            child = db.get(Product, it.ref_id)
+            if child is None:
+                continue
+            for mid, need in _material_demand(db, child, qty, seen.copy()).items():
+                demand[mid] = demand.get(mid, Decimal("0")) + need
     return demand
 
 
-def _part_demand(product: Product) -> dict[int, Decimal]:
-    """汇总产品 BOM 中零件需求（part_id → 总数量）。"""
+def _part_demand(
+    db: Session,
+    product: Product,
+    multiplier: Decimal = Decimal("1"),
+    seen: set[int] | None = None,
+) -> dict[int, Decimal]:
+    """汇总产品 BOM 树中零件需求（part_id → 总数量）。"""
+    seen = seen or set()
+    if product.id in seen:
+        return {}
+    seen.add(product.id)
     demand: dict[int, Decimal] = {}
     for it in product.bom_items:
-        if it.kind != "part" or it.ref_id is None:
-            continue
-        demand[it.ref_id] = demand.get(it.ref_id, Decimal("0")) + (it.qty or Decimal("1"))
+        qty = (it.qty or Decimal("1")) * multiplier
+        if it.kind == "part" and it.ref_id is not None:
+            demand[it.ref_id] = demand.get(it.ref_id, Decimal("0")) + qty
+        elif it.kind == "subproduct" and it.ref_id is not None:
+            child = db.get(Product, it.ref_id)
+            if child is None:
+                continue
+            for pid, need in _part_demand(db, child, qty, seen.copy()).items():
+                demand[pid] = demand.get(pid, Decimal("0")) + need
     return demand
 
 
@@ -133,7 +162,7 @@ def consume_stock_for_product(db: Session, product: Product) -> dict:
     调用方负责 commit/rollback。返回 {"consumed": {...}, "warnings": [...]}。
     """
     mat_demand = _material_demand(db, product)
-    part_demand = _part_demand(product)
+    part_demand = _part_demand(db, product)
 
     # 1. 全量校验
     materials: dict[int, Material] = {}
@@ -169,16 +198,18 @@ def consume_stock_for_product(db: Session, product: Product) -> dict:
     for mid, need in mat_demand.items():
         m = materials[mid]
         m.stock_g -= need
+        deducted = _quant_qty(need)
         consumed["materials"].append(
-            {"name": m.name, "deducted_g": str(need), "remaining_g": str(m.stock_g)}
+            {"name": m.name, "deducted_g": str(deducted), "remaining_g": str(m.stock_g)}
         )
         if m.stock_g < m.low_stock_g:
             warnings.append(f"{m.name} 低于库存阈值")
     for pid, need in part_demand.items():
         p = parts[pid]
         p.stock_qty -= need
+        deducted = _quant_qty(need)
         consumed["parts"].append(
-            {"name": p.name, "deducted_qty": str(need), "remaining_qty": str(p.stock_qty)}
+            {"name": p.name, "deducted_qty": str(deducted), "remaining_qty": str(p.stock_qty)}
         )
         if p.stock_qty < p.low_stock_qty:
             warnings.append(f"{p.name} 低于库存阈值")

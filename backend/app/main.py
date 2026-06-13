@@ -7,7 +7,7 @@ from app.config import settings
 from app.database import Base, engine
 from app.responses import APIError, api_error_handler
 from app.routers import settings as settings_router
-from app.routers import health, machines, materials, parts, print_items, products, purchases, suppliers
+from app.routers import backups, health, machines, materials, parts, print_items, products, purchases, quotes, stats, suppliers
 
 
 @asynccontextmanager
@@ -37,4 +37,7 @@ app.include_router(machines.router)
 app.include_router(purchases.router)
 app.include_router(print_items.router)
 app.include_router(products.router)
+app.include_router(quotes.router)
+app.include_router(stats.router)
+app.include_router(backups.router)
 app.include_router(settings_router.router)
